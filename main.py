@@ -1,20 +1,7 @@
 import streamlit as st
-import csv
+import sqlite3
+import datetime
 import os
-import smtplib
-import ssl
-from datetime import datetime
-from email.mime.text import MIMEText
-
-# =========================
-# CONFIG
-# =========================
-
-ADMIN_PASSWORD = "foerderpilot_admin_2026"
-LEADS_FILE = "leads.csv"
-
-EMAIL_SENDER = os.getenv("EMAIL_USER")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASS")
 
 # =========================
 # PAGE CONFIG
@@ -27,279 +14,231 @@ st.set_page_config(
 )
 
 # =========================
-# DESIGN
+# DATABASE SETUP
+# =========================
+
+conn = sqlite3.connect("leads.db", check_same_thread=False)
+c = conn.cursor()
+
+c.execute("""
+CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT,
+    bundesland TEXT,
+    branche TEXT,
+    mitarbeiter TEXT,
+    created_at TEXT
+)
+""")
+
+conn.commit()
+
+# =========================
+# CUSTOM CSS (PROFESSIONAL LOOK)
 # =========================
 
 st.markdown("""
 <style>
 
 .main-title {
-font-size:42px;
-font-weight:700;
-margin-bottom:10px;
+    font-size:42px;
+    font-weight:700;
+    text-align:center;
+    margin-bottom:10px;
 }
 
 .subtitle {
-font-size:18px;
-color:#888;
-margin-bottom:30px;
+    text-align:center;
+    color:#666;
+    margin-bottom:30px;
+}
+
+.result-box {
+    padding:18px;
+    border-radius:10px;
+    background:#f8fafc;
+    margin-bottom:12px;
+    border:1px solid #e6e9ef;
 }
 
 .success-box {
-background:#0e1117;
-border:1px solid #00ffae;
-padding:20px;
-border-radius:10px;
-margin-top:20px;
+    padding:20px;
+    border-radius:10px;
+    background:#ecfdf5;
+    border:1px solid #10b981;
+    color:#065f46;
+    font-weight:600;
+    margin-top:20px;
 }
 
-.admin-box {
-background:#0e1117;
-border:1px solid #333;
-padding:15px;
-border-radius:8px;
-margin-bottom:10px;
+.footer {
+    text-align:center;
+    margin-top:40px;
+    color:#999;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # =========================
-# PROGRAM DATA
+# HEADER
 # =========================
 
-PROGRAMS = [
-("Digital Jetzt", 50000),
-("KI Förderung Bund", 75000),
-("Go Digital", 30000),
-("Innovationsförderung", 120000),
-("Digitalbonus", 25000),
-("KMU Förderung", 60000),
-("Automatisierungsförderung", 45000)
-]
+st.markdown('<div class="main-title">🚀 FörderPilot AI</div>', unsafe_allow_html=True)
 
-# =========================
-# FUNCTIONS
-# =========================
-
-def calculate_funding():
-
-    total = 0
-
-    for program in PROGRAMS:
-        total += program[1]
-
-    return total
-
-
-def save_lead(name, email, bundesland, funding):
-
-    exists = os.path.isfile(LEADS_FILE)
-
-    with open(LEADS_FILE, "a", newline="", encoding="utf-8") as file:
-
-        writer = csv.writer(file)
-
-        if not exists:
-            writer.writerow([
-                "timestamp",
-                "name",
-                "email",
-                "bundesland",
-                "funding"
-            ])
-
-        writer.writerow([
-            datetime.now(),
-            name,
-            email,
-            bundesland,
-            funding
-        ])
-
-
-def send_email(name, email, funding):
-
-    if not EMAIL_SENDER or not EMAIL_PASSWORD:
-        return
-
-    subject = "Deine Fördermittel-Analyse ist fertig"
-
-    body = f"""
-Hallo {name},
-
-deine Fördermittel-Analyse wurde erfolgreich abgeschlossen.
-
-Basierend auf deinen Angaben stehen dir aktuell Förderprogramme mit einem Gesamtvolumen von bis zu:
-
-{funding:,} €
-
-zur Verfügung.
-
-Diese Programme können für Digitalisierung, KI, Automatisierung und Software genutzt werden.
-
-Viele Unternehmen sichern sich aktuell Förderquoten zwischen 30 % und 80 %.
-
-Beste Grüße
-
-Levin Amatosero  
-FörderPilot AI
-"""
-
-    message = MIMEText(body)
-
-    message["Subject"] = subject
-    message["From"] = EMAIL_SENDER
-    message["To"] = email
-
-    context = ssl.create_default_context()
-
-    try:
-
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context)
-
-        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-
-        server.sendmail(
-            EMAIL_SENDER,
-            email,
-            message.as_string()
-        )
-
-        server.quit()
-
-    except:
-        pass
-
-
-# =========================
-# MODE SWITCH
-# =========================
-
-mode = st.sidebar.selectbox(
-    "Modus",
-    ["Analyse", "Admin"]
+st.markdown(
+    '<div class="subtitle">Finde in 30 Sekunden heraus, welche Fördermittel dein Unternehmen erhalten kann</div>',
+    unsafe_allow_html=True
 )
 
 # =========================
-# USER MODE
+# INPUT FORM
 # =========================
 
-if mode == "Analyse":
+email = st.text_input("Email")
 
-    st.markdown('<div class="main-title">🚀 FörderPilot AI</div>', unsafe_allow_html=True)
+bundeslaender = [
+    "Baden-Württemberg",
+    "Bayern",
+    "Berlin",
+    "Brandenburg",
+    "Bremen",
+    "Hamburg",
+    "Hessen",
+    "Mecklenburg-Vorpommern",
+    "Niedersachsen",
+    "Nordrhein-Westfalen",
+    "Rheinland-Pfalz",
+    "Saarland",
+    "Sachsen",
+    "Sachsen-Anhalt",
+    "Schleswig-Holstein",
+    "Thüringen"
+]
 
-    st.markdown(
-        '<div class="subtitle">Kostenlose Fördermittel Analyse Deutschland</div>',
-        unsafe_allow_html=True
-    )
+bundesland = st.selectbox("Bundesland", bundeslaender)
 
-    name = st.text_input("Name")
+branchen = [
+    "IT & Software",
+    "Handwerk",
+    "Produktion",
+    "E-Commerce",
+    "Beratung",
+    "Marketing",
+    "Gesundheit",
+    "Bildung",
+    "Bau",
+    "Logistik",
+    "Einzelhandel",
+    "Sonstige"
+]
 
-    email = st.text_input("Email")
+branche = st.selectbox("Branche", branchen)
 
-    bundesland = st.selectbox(
-        "Bundesland",
-        [
-        "Baden-Württemberg",
-        "Bayern",
-        "Berlin",
-        "Brandenburg",
-        "Bremen",
-        "Hamburg",
-        "Hessen",
-        "Mecklenburg-Vorpommern",
-        "Niedersachsen",
-        "Nordrhein-Westfalen",
-        "Rheinland-Pfalz",
-        "Saarland",
-        "Sachsen",
-        "Sachsen-Anhalt",
-        "Schleswig-Holstein",
-        "Thüringen"
+mitarbeiter = st.selectbox(
+    "Anzahl Mitarbeiter",
+    [
+        "1",
+        "2–5",
+        "6–10",
+        "11–50",
+        "51–250",
+        "250+"
+    ]
+)
+
+# =========================
+# ANALYSE BUTTON
+# =========================
+
+if st.button("Förderanalyse starten"):
+
+    if email == "":
+        st.error("Bitte Email eingeben")
+    else:
+
+        # SAVE LEAD
+        c.execute(
+            "INSERT INTO leads (email, bundesland, branche, mitarbeiter, created_at) VALUES (?, ?, ?, ?, ?)",
+            (
+                email,
+                bundesland,
+                branche,
+                mitarbeiter,
+                datetime.datetime.now().isoformat()
+            )
+        )
+
+        conn.commit()
+
+        # =========================
+        # RESULT LOGIC
+        # =========================
+
+        foerderungen = [
+
+            ("Digital Jetzt", "bis zu 50.000€"),
+            ("BAFA Förderung", "bis zu 4.000€"),
+            ("KfW Digitalisierung", "bis zu 100.000€"),
+            ("EU Förderprogramm", "bis zu 500.000€"),
+            ("Innovationsförderung", "bis zu 250.000€"),
         ]
-    )
 
-    if st.button("Analyse starten"):
+        st.markdown("### Ergebnis deiner Analyse")
 
-        funding = calculate_funding()
+        for name, betrag in foerderungen:
 
-        save_lead(
-            name,
-            email,
-            bundesland,
-            funding
-        )
-
-        send_email(
-            name,
-            email,
-            funding
-        )
+            st.markdown(
+                f"""
+                <div class="result-box">
+                <b>{name}</b><br>
+                Förderhöhe: {betrag}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
         st.markdown(
-            f"""
+            """
             <div class="success-box">
-            Analyse abgeschlossen<br><br>
-            Maximale Förderhöhe:<br><br>
-            <b>{funding:,} €</b><br><br>
-            Eine Email wurde versendet.
+            ✅ Vollständige Analyse abgeschlossen<br>
+            Du erhältst deine vollständige Förderübersicht per Email.
             </div>
             """,
             unsafe_allow_html=True
         )
 
-
 # =========================
-# ADMIN MODE
+# ADMIN LEADS VIEW
 # =========================
 
-if mode == "Admin":
+st.markdown("---")
 
-    password = st.text_input(
-        "Admin Passwort",
-        type="password"
-    )
+if st.checkbox("Adminbereich anzeigen"):
 
-    if password == ADMIN_PASSWORD:
+    st.write("Gespeicherte Leads:")
 
-        st.title("Admin Dashboard")
+    c.execute("SELECT * FROM leads ORDER BY id DESC")
 
-        if os.path.exists(LEADS_FILE):
+    rows = c.fetchall()
 
-            with open(LEADS_FILE, encoding="utf-8") as file:
+    for row in rows:
 
-                reader = csv.reader(file)
-
-                next(reader)
-
-                for row in reader:
-
-                    st.markdown(
-                        f"""
-                        <div class="admin-box">
-                        Name: {row[1]}<br>
-                        Email: {row[2]}<br>
-                        Bundesland: {row[3]}<br>
-                        Förderung: {row[4]} €<br>
-                        Datum: {row[0]}
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-
-        else:
-
-            st.write("Keine Leads vorhanden.")
-
-    else:
-
-        st.write("Passwort erforderlich")
+        st.write(
+            f"""
+            Email: {row[1]}  
+            Bundesland: {row[2]}  
+            Branche: {row[3]}  
+            Mitarbeiter: {row[4]}  
+            Datum: {row[5]}
+            """
+        )
 
 # =========================
 # FOOTER
 # =========================
 
-st.markdown("---")
-
-st.caption("© 2026 FörderPilot AI")
+st.markdown(
+    '<div class="footer">© 2026 FörderPilot AI</div>',
+    unsafe_allow_html=True
+)
